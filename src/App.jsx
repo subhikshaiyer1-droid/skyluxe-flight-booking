@@ -12,6 +12,9 @@ import SavedItemsPage from './pages/SavedItemsPage';
 import FlightStatusPage from './pages/FlightStatusPage';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
+import TripBudgetPlannerPage from './pages/TripBudgetPlannerPage';
+import MultiCityPlannerPage from './pages/MultiCityPlannerPage';
+import CurrencyConverterPage from './pages/CurrencyConverterPage';
 import './styles/index.css';
 import './styles/App.css';
 
@@ -43,6 +46,9 @@ export default function App() {
             <Route path="/saved" element={<SavedItemsPage />} />
             <Route path="/wishlist" element={<SavedItemsPage />} />
             <Route path="/flight-status" element={<FlightStatusPage />} />
+            <Route path="/trip-planner" element={<TripBudgetPlannerPage />} />
+            <Route path="/multi-city" element={<MultiCityPlannerPage />} />
+            <Route path="/currency-converter" element={<CurrencyConverterPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/about" element={<AboutPage />} />
             {/* Catch-all fallback */}

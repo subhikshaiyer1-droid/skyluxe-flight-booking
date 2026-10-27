@@ -11,7 +11,9 @@ import {
   CheckSquare,
   Square,
   TrendingDown,
-  Sparkles
+  Globe,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function FlightCard({
@@ -82,28 +84,38 @@ export default function FlightCard({
 
   return (
     <div className={`flight-card ${isCompared ? 'flight-card-compared' : ''}`} id={`flight-${flight.id}`}>
-      {/* Top Banner Badges (Cheapest / Fastest) */}
-      {(isCheapest || isFastest) && (
-        <div style={{
-          position: 'absolute',
-          top: '-11px',
-          left: '24px',
-          display: 'flex',
-          gap: '6px',
-          zIndex: 2
-        }}>
-          {isCheapest && (
-            <span className="badge badge-success" style={{ boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)' }}>
-              <TrendingDown size={12} /> Lowest Fare
-            </span>
-          )}
-          {isFastest && (
-            <span className="badge badge-orange" style={{ boxShadow: '0 2px 6px rgba(255, 159, 67, 0.3)' }}>
-              <Zap size={12} /> Fastest Route
-            </span>
-          )}
-        </div>
-      )}
+      {/* Top Banner Badges (Cheapest / Fastest / Journey Type) */}
+      <div style={{
+        position: 'absolute',
+        top: '-11px',
+        left: '20px',
+        display: 'flex',
+        gap: '6px',
+        zIndex: 2,
+        flexWrap: 'wrap'
+      }}>
+        {isCheapest && (
+          <span className="badge badge-success" style={{ boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)' }}>
+            <TrendingDown size={12} /> Lowest Fare
+          </span>
+        )}
+        {isFastest && (
+          <span className="badge badge-orange" style={{ boxShadow: '0 2px 6px rgba(255, 159, 67, 0.3)' }}>
+            <Zap size={12} /> Fastest Route
+          </span>
+        )}
+        <span
+          className="badge"
+          style={{
+            background: flight.isDomestic ? '#E8F1FC' : '#F3E8FF',
+            color: flight.isDomestic ? 'var(--color-primary)' : '#6B21A8',
+            fontWeight: 700,
+            fontSize: '0.72rem'
+          }}
+        >
+          {flight.isDomestic ? '🇮🇳 Domestic India' : '🌐 International Flight'}
+        </span>
+      </div>
 
       {/* Airline Info */}
       <div className="flight-airline-info">
@@ -118,7 +130,9 @@ export default function FlightCard({
         </div>
         <div>
           <h4 className="airline-name">{flight.airline}</h4>
-          <span className="flight-number">{flight.flightNumber} • {flight.aircraft}</span>
+          <span className="flight-number">
+            {flight.flightNumber} • {flight.aircraft}
+          </span>
         </div>
       </div>
 
@@ -127,7 +141,17 @@ export default function FlightCard({
         {/* Departure */}
         <div className="timeline-point">
           <div className="timeline-time">{flight.departureTime}</div>
-          <div className="timeline-city">{flight.fromAirport}</div>
+          <div className="timeline-city">
+            {flight.fromAirport}
+            <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+              {flight.fromCity}
+            </span>
+          </div>
+          {flight.depTz && (
+            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-light)' }}>
+              {flight.depTz.split(' ')[0]}
+            </span>
+          )}
         </div>
 
         {/* Path & Duration */}
@@ -142,9 +166,15 @@ export default function FlightCard({
             className={`badge flight-stop-badge ${
               flight.stops === 0 ? 'badge-primary' : 'badge-orange'
             }`}
+            title={flight.stopDetails}
           >
             {flight.stopDetails}
           </span>
+          {!flight.isDomestic && flight.tzDiffDisplay && (
+            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-light)', marginTop: '2px' }}>
+              {flight.tzDiffDisplay}
+            </span>
+          )}
         </div>
 
         {/* Arrival */}
@@ -152,12 +182,30 @@ export default function FlightCard({
           <div className="timeline-time">
             {flight.arrivalTime}
             {flight.isNextDay && (
-              <sup style={{ fontSize: '0.65rem', color: 'var(--color-orange)', marginLeft: '2px' }}>
-                +1
+              <sup
+                style={{
+                  fontSize: '0.68rem',
+                  color: 'var(--color-orange)',
+                  marginLeft: '3px',
+                  fontWeight: 700
+                }}
+                title={flight.dayOffsetLabel}
+              >
+                {flight.dayOffsetLabel || '+1'}
               </sup>
             )}
           </div>
-          <div className="timeline-city">{flight.toAirport}</div>
+          <div className="timeline-city">
+            {flight.toAirport}
+            <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+              {flight.toCity}
+            </span>
+          </div>
+          {flight.arrTz && (
+            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-light)' }}>
+              {flight.arrTz.split(' ')[0]}
+            </span>
+          )}
         </div>
       </div>
 
@@ -168,8 +216,8 @@ export default function FlightCard({
         </div>
         <div className="flight-price-subtext">
           {passengerCount > 1
-            ? `₹${flight.price.toLocaleString('en-IN')} × ${passengerCount} passengers`
-            : 'Per adult, all taxes included'}
+            ? `₹${flight.price.toLocaleString('en-IN')} × ${passengerCount} travellers`
+            : 'Per traveller, incl. all taxes'}
         </div>
 
         <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '6px' }}>
@@ -231,7 +279,7 @@ export default function FlightCard({
 
         {flight.seatsAvailable <= 4 && (
           <span style={{ fontSize: '0.73rem', color: '#E11D48', fontWeight: 600 }}>
-            Only {flight.seatsAvailable} seats remaining!
+            Only {flight.seatsAvailable} seats left at this price!
           </span>
         )}
       </div>
@@ -245,8 +293,22 @@ export default function FlightCard({
           <Utensils size={14} color="var(--color-orange)" />
           {flight.amenities ? flight.amenities[0] : 'In-flight service'}
         </span>
-        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--color-success)', fontWeight: 600, fontSize: '0.76rem' }}>
-          <ShieldCheck size={14} /> Free Rescheduling within 24h
+        <span style={{
+          marginLeft: 'auto',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          color: flight.refundable ? 'var(--color-success)' : 'var(--color-text-muted)',
+          fontWeight: 600,
+          fontSize: '0.76rem'
+        }}>
+          {flight.refundable ? (
+            <>
+              <ShieldCheck size={14} /> Refundable (Change fee ₹{flight.changeFee?.toLocaleString('en-IN') || 1500})
+            </>
+          ) : (
+            <>Non-refundable Saver</>
+          )}
         </span>
       </div>
     </div>

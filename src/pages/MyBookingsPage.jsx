@@ -16,17 +16,21 @@ import {
   Tag,
   XCircle,
   CheckCircle2,
-  Luggage
+  Luggage,
+  Search,
+  RotateCcw,
+  Globe
 } from 'lucide-react';
 import { getAirportByCode } from '../data/airports';
 
 export default function MyBookingsPage() {
   const [bookings, setBookings] = useState([]);
-  const [filterTab, setFilterTab] = useState('all'); // 'all' | 'upcoming' | 'past' | 'cancelled'
+  const [filterTab, setFilterTab] = useState('all'); // 'all' | 'upcoming' | 'completed' | 'cancelled'
+  const [searchQuery, setSearchQuery] = useState('');
   const [cancelModalBooking, setCancelModalBooking] = useState(null);
   const navigate = useNavigate();
 
-  // Load bookings from localStorage
+  // Load bookings safely from localStorage
   const loadBookings = () => {
     try {
       const stored = localStorage.getItem('skyluxe_bookings');
@@ -56,7 +60,7 @@ export default function MyBookingsPage() {
 
     try {
       const updated = bookings.map((b) => {
-        if (b.id === cancelModalBooking.id) {
+        if (b.id === cancelModalBooking.id || b.bookingReference === cancelModalBooking.bookingReference) {
           return {
             ...b,
             status: 'CANCELLED (DEMO)',
@@ -69,7 +73,6 @@ export default function MyBookingsPage() {
       setBookings(updated);
       localStorage.setItem('skyluxe_bookings', JSON.stringify(updated));
       setCancelModalBooking(null);
-      // Notify components like Navbar
       window.dispatchEvent(new Event('skyluxe_booking_updated'));
     } catch (err) {
       console.error('Error cancelling booking:', err);
@@ -98,29 +101,48 @@ export default function MyBookingsPage() {
     navigate(`/flight-status?ref=${b.bookingReference}`);
   };
 
-  // Filter Bookings by Tab
+  // Filter Bookings by Tab and Search Reference
   const todayStr = new Date().toISOString().split('T')[0];
 
   const filteredBookings = bookings.filter((b) => {
     const isCancelled = b.status?.includes('CANCELLED');
-    const flightDate = b.searchParams?.departureDate || todayStr;
+    const flightDate = b.searchParams?.departureDate || b.bookedAt?.split('T')[0] || todayStr;
 
+    // Tab filter
     if (filterTab === 'cancelled') {
-      return isCancelled;
+      if (!isCancelled) return false;
+    } else if (filterTab === 'upcoming') {
+      if (isCancelled || flightDate < todayStr) return false;
+    } else if (filterTab === 'completed') {
+      if (isCancelled || flightDate >= todayStr) return false;
     }
-    if (filterTab === 'upcoming') {
-      return !isCancelled && flightDate >= todayStr;
+
+    // Search query filter (PNR, Passenger Name, Cities, Airline)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const pnr = (b.bookingReference || b.id || '').toLowerCase();
+      const name = (b.passenger?.fullName || '').toLowerCase();
+      const airline = (b.flight?.airline || '').toLowerCase();
+      const from = (b.flight?.fromCity || b.flight?.fromAirport || '').toLowerCase();
+      const to = (b.flight?.toCity || b.flight?.toAirport || '').toLowerCase();
+
+      const matches =
+        pnr.includes(q) ||
+        name.includes(q) ||
+        airline.includes(q) ||
+        from.includes(q) ||
+        to.includes(q);
+
+      if (!matches) return false;
     }
-    if (filterTab === 'past') {
-      return !isCancelled && flightDate < todayStr;
-    }
-    return true; // 'all'
+
+    return true;
   });
 
   return (
-    <div className="my-bookings-page">
+    <div className="my-bookings-page section-pad" style={{ paddingTop: '36px' }}>
       <div className="container">
-        {/* Page Title & Stats */}
+        {/* Page Title & Actions */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <div className="badge badge-primary" style={{ marginBottom: '8px' }}>
@@ -131,7 +153,7 @@ export default function MyBookingsPage() {
               My Bookings
             </h1>
             <p style={{ margin: '6px 0 0', color: 'var(--color-text-muted)' }}>
-              Manage, review, track, or cancel your simulated flight reservations.
+              Review, track, print, or cancel your simulated domestic and international flight reservations.
             </p>
           </div>
 
@@ -141,82 +163,133 @@ export default function MyBookingsPage() {
           </Link>
         </div>
 
-        {/* Tab Filters: All, Upcoming, Past, Cancelled */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className={`trip-pill ${filterTab === 'all' ? 'active' : ''}`}
-            onClick={() => setFilterTab('all')}
-          >
-            All Bookings ({bookings.length})
-          </button>
-          <button
-            type="button"
-            className={`trip-pill ${filterTab === 'upcoming' ? 'active' : ''}`}
-            onClick={() => setFilterTab('upcoming')}
-          >
-            Upcoming
-          </button>
-          <button
-            type="button"
-            className={`trip-pill ${filterTab === 'past' ? 'active' : ''}`}
-            onClick={() => setFilterTab('past')}
-          >
-            Past Travels
-          </button>
-          <button
-            type="button"
-            className={`trip-pill ${filterTab === 'cancelled' ? 'active' : ''}`}
-            onClick={() => setFilterTab('cancelled')}
-          >
-            Cancelled
-          </button>
+        {/* Tab Filters & Search Bar Row */}
+        <div style={{
+          background: 'white',
+          padding: '16px 20px',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border-subtle)',
+          boxShadow: 'var(--shadow-sm)',
+          marginBottom: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}>
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={`trip-pill ${filterTab === 'all' ? 'active' : ''}`}
+              onClick={() => setFilterTab('all')}
+            >
+              All ({bookings.length})
+            </button>
+            <button
+              type="button"
+              className={`trip-pill ${filterTab === 'upcoming' ? 'active' : ''}`}
+              onClick={() => setFilterTab('upcoming')}
+            >
+              Upcoming
+            </button>
+            <button
+              type="button"
+              className={`trip-pill ${filterTab === 'completed' ? 'active' : ''}`}
+              onClick={() => setFilterTab('completed')}
+            >
+              Completed Travels
+            </button>
+            <button
+              type="button"
+              className={`trip-pill ${filterTab === 'cancelled' ? 'active' : ''}`}
+              onClick={() => setFilterTab('cancelled')}
+            >
+              Cancelled
+            </button>
+          </div>
+
+          {/* Search by Reference or Name */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '260px' }}>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
+              <input
+                type="text"
+                className="field-input"
+                placeholder="Search by PNR or name..."
+                style={{ paddingLeft: '34px', fontSize: '0.85rem' }}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '0.8rem' }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
         {/* List of bookings */}
         {filteredBookings.length > 0 ? (
-          <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {filteredBookings.map((item) => {
-              const fromAirport = getAirportByCode(item.flight.fromAirport);
-              const toAirport = getAirportByCode(item.flight.toAirport);
+              // Backward compatible airport lookup
+              const fromCode = item.flight?.fromAirport || 'BOM';
+              const toCode = item.flight?.toAirport || 'DEL';
+              const fromAirport = getAirportByCode(fromCode);
+              const toAirport = getAirportByCode(toCode);
               const depDate = item.searchParams?.departureDate || 'Upcoming Date';
               const isCancelled = item.status?.includes('CANCELLED');
+              const isDomestic = item.flight?.isDomestic ?? (fromAirport?.isDomestic && toAirport?.isDomestic);
+
               const seats = Array.isArray(item.passenger?.selectedSeats)
                 ? item.passenger.selectedSeats.join(', ')
                 : item.passenger?.selectedSeats || 'Standard 12A';
 
+              const totalPrice = item.fareBreakdown?.totalPrice || item.flight?.price || 4200;
+
               return (
                 <div key={item.id} className="my-booking-card" id={`booking-card-${item.id}`}>
                   {/* Airline & Status */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '180px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '190px' }}>
                     <div
                       className="airline-logo-badge"
                       style={{
-                        backgroundColor: item.flight.airlineBgLight || '#EBF3FF',
-                        color: item.flight.airlineColor || 'var(--color-primary)'
+                        backgroundColor: item.flight?.airlineBgLight || '#EBF3FF',
+                        color: item.flight?.airlineColor || 'var(--color-primary)'
                       }}
                     >
-                      {item.flight.airlineCode}
+                      {item.flight?.airlineCode || 'SL'}
                     </div>
                     <div>
                       <h3 style={{ fontSize: '1.05rem', color: 'var(--color-navy)', margin: '0 0 2px' }}>
-                        {item.flight.airline}
+                        {item.flight?.airline || 'SkyLuxe Airways'}
                       </h3>
-                      <span
-                        className={`badge ${isCancelled ? 'badge-orange' : 'badge-success'}`}
-                        style={{ fontSize: '0.72rem' }}
-                      >
-                        {item.status}
-                      </span>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        <span
+                          className={`badge ${isCancelled ? 'badge-orange' : 'badge-success'}`}
+                          style={{ fontSize: '0.72rem' }}
+                        >
+                          {isCancelled ? 'Cancelled (Demo)' : 'Confirmed'}
+                        </span>
+                        <span className="badge" style={{ fontSize: '0.7rem', background: '#F1F5F9', color: '#475569' }}>
+                          {isDomestic ? 'Domestic' : 'International'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Route & Timing & Meta */}
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-navy)', marginBottom: '4px' }}>
-                      <span>{fromAirport.city} ({fromAirport.code})</span>
+                      <span>{fromAirport.flag} {fromAirport.city} ({fromAirport.code})</span>
                       <ArrowRight size={18} color="var(--color-primary)" />
-                      <span>{toAirport.city} ({toAirport.code})</span>
+                      <span>{toAirport.flag} {toAirport.city} ({toAirport.code})</span>
                     </div>
 
                     <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '0.84rem', color: 'var(--color-text-muted)' }}>
@@ -226,7 +299,7 @@ export default function MyBookingsPage() {
                       </span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <User size={13} color="var(--color-navy)" />
-                        <span>{item.passenger?.fullName}</span>
+                        <span>{item.passenger?.fullName || 'Demo Passenger'}</span>
                       </span>
                       <span>
                         Seat(s): <strong style={{ color: 'var(--color-primary)' }}>{seats}</strong>
@@ -236,63 +309,71 @@ export default function MyBookingsPage() {
                       </span>
                       {item.fareBreakdown?.appliedCoupon && (
                         <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>
-                          🏷️ {item.fareBreakdown.appliedCoupon} (-₹{item.fareBreakdown.couponDiscountAmount})
+                          🏷️ {item.fareBreakdown.appliedCoupon?.code || item.fareBreakdown.appliedCoupon} (-₹{item.fareBreakdown.couponDiscountAmount})
                         </span>
                       )}
                     </div>
+
+                    {/* Flight Times & Duration */}
+                    <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--color-navy)', display: 'flex', gap: '12px' }}>
+                      <span>Dep: <strong>{item.flight?.departureTime}</strong> ({item.flight?.fromAirport})</span>
+                      <span>Arr: <strong>{item.flight?.arrivalTime}</strong> ({item.flight?.toAirport})</span>
+                      <span>Duration: <strong>{item.flight?.duration}</strong></span>
+                    </div>
                   </div>
 
-                  {/* Price & Action Buttons */}
-                  <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                    <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-navy)' }}>
-                      ₹{item.fareBreakdown?.totalPrice?.toLocaleString('en-IN') || item.flight.price}
+                  {/* Fare & Management Actions */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', minWidth: '170px' }}>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-navy)' }}>
+                      ₹{totalPrice.toLocaleString('en-IN')}
                     </div>
 
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      {/* Track Status */}
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => handleTrackStatus(item)}
-                        title="Simulated Flight Status"
-                      >
-                        <Clock size={14} color="var(--color-primary)" />
-                        <span>Track</span>
-                      </button>
-
-                      {/* View Boarding Pass */}
+                      {/* View & Print Boarding Pass */}
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
                         onClick={() => handleViewConfirmation(item)}
-                        title="View Full Boarding Pass"
+                        title="View & Print Boarding Pass"
                       >
-                        <Eye size={14} />
-                        <span>Boarding Pass</span>
+                        <Printer size={14} />
+                        <span>Print</span>
                       </button>
 
-                      {/* Cancel / Delete */}
-                      {!isCancelled ? (
+                      {/* Track Flight */}
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => handleTrackStatus(item)}
+                        title="Track flight status"
+                      >
+                        <Clock size={14} />
+                        <span>Track</span>
+                      </button>
+
+                      {/* Cancel Booking (only if active) */}
+                      {!isCancelled && (
                         <button
                           type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ color: '#EF4444', borderColor: '#FCA5A5' }}
+                          className="btn btn-sm"
+                          style={{ color: '#E11D48', borderColor: '#FECDD3', background: '#FFF1F2' }}
                           onClick={() => setCancelModalBooking(item)}
-                          title="Cancel demo reservation"
+                          title="Simulate cancellation"
                         >
-                          <XCircle size={14} />
-                          <span>Cancel</span>
+                          Cancel
                         </button>
-                      ) : (
+                      )}
+
+                      {/* Permanent Delete if already cancelled */}
+                      {isCancelled && (
                         <button
                           type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ color: '#9CA3AF' }}
+                          className="btn btn-sm"
+                          style={{ color: 'var(--color-text-muted)', background: 'transparent' }}
                           onClick={() => handlePermanentDelete(item.id)}
-                          title="Remove cancelled record"
+                          title="Remove from history"
                         >
                           <Trash2 size={14} />
-                          <span>Delete</span>
                         </button>
                       )}
                     </div>
@@ -303,64 +384,90 @@ export default function MyBookingsPage() {
           </div>
         ) : (
           /* Empty State */
-          <div className="empty-results-card" style={{ maxWidth: '600px', margin: '40px auto' }}>
+          <div className="empty-results-card">
             <div style={{
-              width: '80px',
-              height: '80px',
+              width: '64px',
+              height: '64px',
               borderRadius: '50%',
               background: 'var(--color-primary-light)',
               color: 'var(--color-primary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto 20px'
+              margin: '0 auto 16px'
             }}>
-              <Plane size={40} style={{ transform: 'rotate(-45deg)' }} />
+              <Plane size={32} />
             </div>
-
-            <h2 style={{ fontSize: '1.6rem', color: 'var(--color-navy)', marginBottom: '8px' }}>
-              No {filterTab !== 'all' ? `${filterTab} ` : ''}Demo Bookings Found
-            </h2>
-
-            <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px', lineHeight: 1.6 }}>
-              You don’t have any {filterTab !== 'all' ? filterTab : 'active'} flight reservations in your browser. Choose your preferred destination, complete the quick demo passenger form, and your tickets will appear here!
+            <h3 style={{ fontSize: '1.3rem', color: 'var(--color-navy)', marginBottom: '8px' }}>
+              {searchQuery ? 'No matching bookings found' : 'No bookings in this category'}
+            </h3>
+            <p style={{ fontSize: '0.92rem', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
+              {searchQuery
+                ? `No flight booking matched "${searchQuery}". Please check your booking reference (PNR).`
+                : 'You have no reservations under this filter. Search flights and confirm a simulated booking!'}
             </p>
-
-            <Link to="/search" className="btn btn-primary btn-lg">
-              <Plane size={18} />
-              <span>Search Flights Now</span>
-            </Link>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <RotateCcw size={15} />
+                  <span>Clear Search</span>
+                </button>
+              )}
+              <Link to="/search" className="btn btn-primary">
+                <Search size={16} />
+                <span>Find Flights Now</span>
+              </Link>
+            </div>
           </div>
         )}
 
-        {/* Cancellation Confirmation Modal */}
+        {/* Demo Cancellation Modal Confirmation */}
         {cancelModalBooking && (
-          <div className="planner-modal-overlay" onClick={() => setCancelModalBooking(null)}>
-            <div className="planner-modal-container" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ padding: '24px', textAlign: 'center' }}>
+          <div className="planner-modal-overlay" onClick={() => setCancelModalBooking(null)} role="dialog" aria-modal="true">
+            <div
+              className="planner-modal-container"
+              style={{ maxWidth: '480px' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ padding: '24px' }}>
                 <div style={{
-                  width: '60px',
-                  height: '60px',
+                  width: '48px',
+                  height: '48px',
                   borderRadius: '50%',
-                  background: 'var(--color-orange-light)',
-                  color: 'var(--color-orange)',
+                  background: '#FEE2E2',
+                  color: '#DC2626',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  margin: '0 auto 16px'
+                  marginBottom: '16px'
                 }}>
-                  <AlertCircle size={32} />
+                  <AlertCircle size={26} />
                 </div>
-                <h3 style={{ fontSize: '1.3rem', color: 'var(--color-navy)', marginBottom: '8px' }}>
-                  Cancel Demo Reservation?
+
+                <h3 style={{ fontSize: '1.25rem', color: 'var(--color-navy)', marginBottom: '8px' }}>
+                  Cancel Flight Booking?
                 </h3>
-                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
+
+                <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', lineHeight: '1.5', marginBottom: '16px' }}>
                   Are you sure you want to cancel booking <strong>{cancelModalBooking.bookingReference}</strong> ({cancelModalBooking.flight?.airline} {cancelModalBooking.flight?.fromAirport} → {cancelModalBooking.flight?.toAirport})?
-                  <br /><br />
-                  This will mark the ticket as <em>CANCELLED (DEMO)</em> and deduct it from your active bookings.
                 </p>
 
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border-subtle)', marginBottom: '20px', fontSize: '0.82rem', color: 'var(--color-navy)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span>Original Fare Paid:</span>
+                    <span>₹{cancelModalBooking.fareBreakdown?.totalPrice?.toLocaleString('en-IN') || cancelModalBooking.flight?.price}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 600 }}>
+                    <span>Estimated Demo Refund:</span>
+                    <span>₹{cancelModalBooking.fareBreakdown?.estimatedRefund?.toLocaleString('en-IN') || Math.round((cancelModalBooking.fareBreakdown?.totalPrice || 4000) * 0.7).toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                   <button
                     type="button"
                     className="btn btn-secondary"
@@ -370,8 +477,8 @@ export default function MyBookingsPage() {
                   </button>
                   <button
                     type="button"
-                    className="btn btn-primary"
-                    style={{ background: '#EF4444', borderColor: '#EF4444' }}
+                    className="btn"
+                    style={{ background: '#DC2626', color: 'white' }}
                     onClick={handleConfirmCancel}
                   >
                     Confirm Cancellation

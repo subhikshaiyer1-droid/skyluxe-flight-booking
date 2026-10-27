@@ -13,7 +13,10 @@ import {
   User,
   ShieldCheck,
   Download,
-  Tag
+  Tag,
+  Globe,
+  Luggage,
+  FileText
 } from 'lucide-react';
 import { getAirportByCode } from '../data/airports';
 
@@ -56,6 +59,7 @@ export default function ConfirmationPage() {
   const { flight, passenger, fareBreakdown, bookingReference } = booking;
   const fromAirport = getAirportByCode(flight.fromAirport);
   const toAirport = getAirportByCode(flight.toAirport);
+  const isDomestic = flight.isDomestic;
 
   const handlePrint = () => {
     window.print();
@@ -88,7 +92,7 @@ export default function ConfirmationPage() {
         <div className="demo-notice-alert" style={{ marginBottom: '24px' }}>
           <AlertTriangle size={20} color="#D97706" style={{ flexShrink: 0 }} />
           <div>
-            <strong>Demonstration Booking Only:</strong> This booking reference <code>{bookingReference}</code> is generated solely for college project demonstration and evaluation purposes. No real airline reservation has been made.
+            <strong>Demonstration Booking Only:</strong> This booking reference <code>{bookingReference}</code> is generated solely for academic demonstration and viva review. No actual ticket is issued.
           </div>
         </div>
 
@@ -111,7 +115,9 @@ export default function ConfirmationPage() {
               </div>
               <div>
                 <h3 style={{ margin: 0, color: 'white', fontSize: '1.25rem' }}>{flight.airline}</h3>
-                <span style={{ fontSize: '0.8rem', color: '#B3C8E4' }}>Flight #{flight.flightNumber} • {flight.cabinClass}</span>
+                <span style={{ fontSize: '0.8rem', color: '#B3C8E4' }}>
+                  Flight #{flight.flightNumber} • {flight.cabinClass || 'Economy'} • {isDomestic ? 'Domestic' : 'International'}
+                </span>
               </div>
             </div>
 
@@ -152,6 +158,24 @@ export default function ConfirmationPage() {
                 <span className="ticket-label">Boarding Gate</span>
                 <span className="ticket-value">Gate T2-B14</span>
               </div>
+
+              {/* International Document details */}
+              {!isDomestic && passenger.passportNumber && (
+                <>
+                  <div className="ticket-item">
+                    <span className="ticket-label">Passport Number</span>
+                    <span className="ticket-value" style={{ letterSpacing: '1px' }}>
+                      {passenger.passportNumber}
+                    </span>
+                  </div>
+                  <div className="ticket-item">
+                    <span className="ticket-label">Nationality</span>
+                    <span className="ticket-value">
+                      {passenger.nationality || 'Indian'}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Flight Route Visual Timeline */}
@@ -162,21 +186,26 @@ export default function ConfirmationPage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '28px'
+              marginBottom: '28px',
+              flexWrap: 'wrap',
+              gap: '16px'
             }}>
               <div>
                 <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-navy)' }}>
                   {flight.departureTime}
                 </div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-                  {fromAirport.city} ({fromAirport.code})
+                  {fromAirport?.flag} {fromAirport?.city} ({fromAirport?.code})
                 </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', maxWidth: '200px' }}>
-                  {fromAirport.name}
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', maxWidth: '220px' }}>
+                  {fromAirport?.name}
                 </div>
+                {flight.depTz && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-light)' }}>{flight.depTz}</div>
+                )}
               </div>
 
-              <div style={{ flex: 1, padding: '0 30px', textAlign: 'center' }}>
+              <div style={{ flex: 1, minWidth: '160px', padding: '0 20px', textAlign: 'center' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
                   {flight.duration}
                 </span>
@@ -206,14 +235,18 @@ export default function ConfirmationPage() {
 
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-navy)' }}>
-                  {flight.arrivalTime}
+                  {flight.arrivalTime}{' '}
+                  {flight.isNextDay && <sup style={{ color: 'var(--color-orange)', fontSize: '0.7rem' }}>+1</sup>}
                 </div>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-                  {toAirport.city} ({toAirport.code})
+                  {toAirport?.flag} {toAirport?.city} ({toAirport?.code})
                 </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', maxWidth: '200px' }}>
-                  {toAirport.name}
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', maxWidth: '220px' }}>
+                  {toAirport?.name}
                 </div>
+                {flight.arrTz && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-light)' }}>{flight.arrTz}</div>
+                )}
               </div>
             </div>
 
@@ -232,19 +265,22 @@ export default function ConfirmationPage() {
                   📞 {passenger.phone}
                 </div>
 
-                {fareBreakdown.appliedCoupon && (
-                  <div style={{ marginTop: '8px' }}>
+                <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <span className="badge" style={{ background: '#E0F2FE', color: '#0369A1', fontSize: '0.75rem' }}>
+                    <Luggage size={12} /> {flight.baggage}
+                  </span>
+                  {fareBreakdown?.appliedCoupon && (
                     <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>
-                      <Tag size={12} /> Coupon: {fareBreakdown.appliedCoupon} (-₹{fareBreakdown.couponDiscountAmount})
+                      <Tag size={12} /> Coupon: {fareBreakdown.appliedCoupon?.code || fareBreakdown.appliedCoupon} (-₹{fareBreakdown.couponDiscountAmount})
                     </span>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <div style={{ textAlign: 'right' }}>
                 <span className="ticket-label">Total Simulated Fare Paid</span>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--color-navy)' }}>
-                  ₹{fareBreakdown.totalPrice.toLocaleString('en-IN')}
+                  ₹{fareBreakdown?.totalPrice?.toLocaleString('en-IN')}
                 </div>
                 <div style={{ fontSize: '0.76rem', color: 'var(--color-success)', fontWeight: 600 }}>
                   ✓ Demo Transaction Completed

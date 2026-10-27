@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AIRPORTS } from '../data/airports';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { AIRPORTS, DOMESTIC_AIRPORTS, INTERNATIONAL_AIRPORTS, isDomesticRoute, getAirportByCode } from '../data/airports';
+import { saveRecentSearch } from '../utils/plannerStorage';
 import {
   ArrowLeftRight,
   Calendar,
@@ -9,7 +10,11 @@ import {
   PlaneTakeoff,
   PlaneLanding,
   Briefcase,
-  AlertCircle
+  AlertCircle,
+  Globe,
+  MapPin,
+  Sparkles,
+  Compass
 } from 'lucide-react';
 
 export default function FlightSearchForm({ initialValues = {}, onSearch = null, compact = false }) {
@@ -26,10 +31,19 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
 
   const todayStr = formatDateString(new Date());
 
+  // Determine initial flight type: domestic vs international based on initial airport codes
+  const initialFlightType = () => {
+    if (initialValues.flightCategory) return initialValues.flightCategory;
+    const fromCode = initialValues.from || 'BOM';
+    const toCode = initialValues.to || 'DEL';
+    return isDomesticRoute(fromCode, toCode) ? 'domestic' : 'international';
+  };
+
   // Form State
-  const [tripType, setTripType] = useState(initialValues.tripType || 'oneWay');
-  const [origin, setOrigin] = useState(initialValues.from || 'BOM');
-  const [destination, setDestination] = useState(initialValues.to || 'DEL');
+  const [flightCategory, setFlightCategory] = useState(initialFlightType()); // 'domestic' | 'international'
+  const [tripType, setTripType] = useState(initialValues.tripType || 'oneWay'); // 'oneWay' | 'roundTrip'
+  const [origin, setOrigin] = useState(initialValues.from || (initialFlightType() === 'domestic' ? 'BOM' : 'BOM'));
+  const [destination, setDestination] = useState(initialValues.to || (initialFlightType() === 'domestic' ? 'DEL' : 'DXB'));
   const [departureDate, setDepartureDate] = useState(initialValues.departureDate || todayStr);
   const [returnDate, setReturnDate] = useState(initialValues.returnDate || '');
   const [passengers, setPassengers] = useState(initialValues.passengers ? Number(initialValues.passengers) : 1);
@@ -38,8 +52,50 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
   // Error State for friendly validation
   const [errors, setErrors] = useState({});
 
+  // When switching between Domestic and International, adjust destination gracefully if needed
+  const handleCategorySwitch = (category) => {
+    setFlightCategory(category);
+    setErrors({});
+
+    if (category === 'domestic') {
+      // Ensure origin and destination are domestic
+      const isFromDom = getAirportByCode(origin)?.isDomestic;
+      const isToDom = getAirportByCode(destination)?.isDomestic;
+
+      const newFrom = isFromDom ? origin : 'BOM';
+      let newTo = isToDom ? destination : 'DEL';
+      if (newFrom === newTo) {
+        newTo = newFrom === 'BOM' ? 'DEL' : 'BOM';
+      }
+      setOrigin(newFrom);
+      setDestination(newTo);
+    } else {
+      // International: default destination to DXB if currently domestic
+      const isToDom = getAirportByCode(destination)?.isDomestic;
+      if (isToDom) {
+        setDestination('DXB');
+      }
+    }
+  };
+
+  // Quick route presets
+  const handleQuickRoute = (from, to, cat = 'domestic') => {
+    setFlightCategory(cat);
+    setOrigin(from);
+    setDestination(to);
+    setErrors({});
+  };
+
   // Swap airports handler
   const handleSwapAirports = () => {
+    // Check if swap would violate domestic constraint
+    if (flightCategory === 'domestic') {
+      const isFromDom = getAirportByCode(destination)?.isDomestic;
+      const isToDom = getAirportByCode(origin)?.isDomestic;
+      if (!isFromDom || !isToDom) {
+        setFlightCategory('international');
+      }
+    }
     const temp = origin;
     setOrigin(destination);
     setDestination(temp);
@@ -54,28 +110,37 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
 
     // 1. Origin and destination required
     if (!origin) {
-      newErrors.origin = 'Please select an origin city.';
+      newErrors.origin = 'Please select a departure city.';
     }
     if (!destination) {
-      newErrors.destination = 'Please select a destination city.';
+      newErrors.destination = 'Please select an arrival city.';
     }
 
     // 2. Origin and destination cannot be identical
     if (origin && destination && origin.toUpperCase() === destination.toUpperCase()) {
-      newErrors.destination = 'Origin and destination cannot be identical.';
+      newErrors.destination = 'Departure and arrival airports cannot be identical.';
     }
 
-    // 3. Departure date cannot be in the past
+    // 3. Category constraint check
+    if (flightCategory === 'domestic') {
+      const fromAir = getAirportByCode(origin);
+      const toAir = getAirportByCode(destination);
+      if (!fromAir?.isDomestic || !toAir?.isDomestic) {
+        newErrors.destination = 'Domestic flights must be between airports within India.';
+      }
+    }
+
+    // 4. Departure date cannot be in the past
     if (!departureDate) {
       newErrors.departureDate = 'Departure date is required.';
     } else if (departureDate < todayStr) {
       newErrors.departureDate = 'Departure date cannot be in the past.';
     }
 
-    // 4. Return date cannot be earlier than departure date if round-trip
+    // 5. Return date validation for round-trip
     if (tripType === 'roundTrip') {
       if (!returnDate) {
-        newErrors.returnDate = 'Return date is required for round trips.';
+        newErrors.returnDate = 'Return date is required for round-trip journeys.';
       } else if (returnDate < departureDate) {
         newErrors.returnDate = 'Return date cannot be earlier than departure date.';
       }
@@ -92,13 +157,26 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
       return;
     }
 
+    // Save search to LocalStorage for Recent Searches
+    saveRecentSearch({
+      from: origin,
+      to: destination,
+      departureDate,
+      returnDate: tripType === 'roundTrip' ? returnDate : null,
+      tripType,
+      passengers,
+      cabinClass,
+      category: flightCategory
+    });
+
     const queryParams = new URLSearchParams({
       from: origin,
       to: destination,
       departureDate,
       tripType,
       passengers: String(passengers),
-      cabinClass
+      cabinClass,
+      category: flightCategory
     });
 
     if (tripType === 'roundTrip' && returnDate) {
@@ -113,57 +191,198 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
         returnDate,
         tripType,
         passengers,
-        cabinClass
+        cabinClass,
+        category: flightCategory
       });
     } else {
       navigate(`/search?${queryParams.toString()}`);
     }
   };
 
+  // Airport dropdown lists based on category
+  const originAirportList = flightCategory === 'domestic' ? DOMESTIC_AIRPORTS : AIRPORTS;
+  const destinationAirportList = flightCategory === 'domestic' ? DOMESTIC_AIRPORTS : AIRPORTS;
+
   return (
     <div className={`search-card ${compact ? 'search-card-compact' : ''}`}>
-      {/* Trip Type Pills */}
-      <div className="trip-type-selector">
+      {/* Flight Category Tabs: Domestic Flights vs International Flights */}
+      <div className="flight-category-tabs" style={{ display: 'flex', gap: '10px', marginBottom: '16px', borderBottom: '1px solid var(--color-border-subtle)', paddingBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
         <button
           type="button"
-          className={`trip-pill ${tripType === 'oneWay' ? 'active' : ''}`}
-          onClick={() => {
-            setTripType('oneWay');
-            setErrors((prev) => ({ ...prev, returnDate: null }));
+          className={`category-tab-btn ${flightCategory === 'domestic' ? 'active' : ''}`}
+          onClick={() => handleCategorySwitch('domestic')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '9px 18px',
+            borderRadius: 'var(--radius-pill)',
+            border: flightCategory === 'domestic' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+            background: flightCategory === 'domestic' ? 'var(--color-primary-light)' : 'var(--color-white)',
+            color: flightCategory === 'domestic' ? 'var(--color-primary)' : 'var(--color-navy)',
+            fontWeight: 700,
+            fontSize: '0.92rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
           }}
         >
-          <span>One-way</span>
+          <span>🇮🇳</span>
+          <span>Domestic Flights (India)</span>
         </button>
 
         <button
           type="button"
-          className={`trip-pill ${tripType === 'roundTrip' ? 'active' : ''}`}
-          onClick={() => {
-            setTripType('roundTrip');
-            if (!returnDate) {
-              // Default return date to 3 days after departure
-              const nextDate = new Date(departureDate || todayStr);
-              nextDate.setDate(nextDate.getDate() + 3);
-              setReturnDate(formatDateString(nextDate));
-            }
+          className={`category-tab-btn ${flightCategory === 'international' ? 'active' : ''}`}
+          onClick={() => handleCategorySwitch('international')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '9px 18px',
+            borderRadius: 'var(--radius-pill)',
+            border: flightCategory === 'international' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+            background: flightCategory === 'international' ? 'var(--color-primary-light)' : 'var(--color-white)',
+            color: flightCategory === 'international' ? 'var(--color-primary)' : 'var(--color-navy)',
+            fontWeight: 700,
+            fontSize: '0.92rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
           }}
         >
-          <span>Round-trip</span>
+          <Globe size={16} />
+          <span>International Flights</span>
         </button>
 
-        <span style={{ marginLeft: 'auto', fontSize: '0.82rem', color: 'var(--color-text-light)' }}>
-          ✈️ Demo Flight Finder
-        </span>
+        <Link
+          to="/multi-city"
+          style={{
+            marginLeft: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.86rem',
+            fontWeight: 600,
+            color: 'var(--color-primary)',
+            textDecoration: 'none',
+            padding: '6px 12px',
+            borderRadius: 'var(--radius-sm)',
+            background: '#F0F7FF'
+          }}
+        >
+          <Compass size={14} />
+          <span>Multi-City Planner</span>
+        </Link>
       </div>
 
-      <form onSubmit={handleSubmit} noValidate>
+      {/* Trip Type Selector & Quick Suggestions */}
+      <div className="trip-type-selector" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className={`trip-pill ${tripType === 'oneWay' ? 'active' : ''}`}
+            onClick={() => {
+              setTripType('oneWay');
+              setErrors((prev) => ({ ...prev, returnDate: null }));
+            }}
+          >
+            <span>One-way</span>
+          </button>
+
+          <button
+            type="button"
+            className={`trip-pill ${tripType === 'roundTrip' ? 'active' : ''}`}
+            onClick={() => {
+              setTripType('roundTrip');
+              if (!returnDate) {
+                const nextDate = new Date(departureDate || todayStr);
+                nextDate.setDate(nextDate.getDate() + 4);
+                setReturnDate(formatDateString(nextDate));
+              }
+            }}
+          >
+            <span>Round-trip</span>
+          </button>
+        </div>
+
+        {/* Quick Route Suggestion Pills */}
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+            Popular:
+          </span>
+          {flightCategory === 'domestic' ? (
+            <>
+              <button
+                type="button"
+                className="quick-route-chip"
+                onClick={() => handleQuickRoute('BOM', 'GOI', 'domestic')}
+                title="Mumbai to Goa"
+              >
+                BOM → GOI
+              </button>
+              <button
+                type="button"
+                className="quick-route-chip"
+                onClick={() => handleQuickRoute('DEL', 'BOM', 'domestic')}
+                title="Delhi to Mumbai"
+              >
+                DEL → BOM
+              </button>
+              <button
+                type="button"
+                className="quick-route-chip"
+                onClick={() => handleQuickRoute('BLR', 'DEL', 'domestic')}
+                title="Bengaluru to Delhi"
+              >
+                BLR → DEL
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="quick-route-chip"
+                onClick={() => handleQuickRoute('BOM', 'DXB', 'international')}
+                title="Mumbai to Dubai"
+              >
+                BOM → DXB
+              </button>
+              <button
+                type="button"
+                className="quick-route-chip"
+                onClick={() => handleQuickRoute('DEL', 'LHR', 'international')}
+                title="Delhi to London"
+              >
+                DEL → LHR
+              </button>
+              <button
+                type="button"
+                className="quick-route-chip"
+                onClick={() => handleQuickRoute('BOM', 'SIN', 'international')}
+                title="Mumbai to Singapore"
+              >
+                BOM → SIN
+              </button>
+              <button
+                type="button"
+                className="quick-route-chip"
+                onClick={() => handleQuickRoute('BLR', 'BKK', 'international')}
+                title="Bengaluru to Bangkok"
+              >
+                BLR → BKK
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} noValidate style={{ marginTop: '16px' }}>
         {/* Main Fields Grid: Origin - Swap - Destination - Departure Date - Return Date */}
         <div className="search-fields-grid">
           {/* Origin Airport */}
           <div className="search-field">
             <label htmlFor="origin-airport" className="field-label">
               <PlaneTakeoff size={15} className="field-icon" />
-              <span>From Airport</span>
+              <span>From ({flightCategory === 'domestic' ? 'India' : 'Origin'})</span>
             </label>
             <div className={`field-input-box ${errors.origin ? 'has-error' : ''}`}>
               <select
@@ -177,11 +396,30 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
                   }
                 }}
               >
-                {AIRPORTS.map((airport) => (
-                  <option key={`from-${airport.code}`} value={airport.code}>
-                    {airport.flag} {airport.city} ({airport.code})
-                  </option>
-                ))}
+                {flightCategory === 'domestic' ? (
+                  originAirportList.map((airport) => (
+                    <option key={`from-${airport.code}`} value={airport.code}>
+                      {airport.flag} {airport.city} ({airport.code})
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <optgroup label="── Indian Hubs (Departures) ──">
+                      {DOMESTIC_AIRPORTS.map((airport) => (
+                        <option key={`from-in-${airport.code}`} value={airport.code}>
+                          {airport.flag} {airport.city} ({airport.code})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="── International Hubs ──">
+                      {INTERNATIONAL_AIRPORTS.map((airport) => (
+                        <option key={`from-int-${airport.code}`} value={airport.code}>
+                          {airport.flag} {airport.city} ({airport.code}) - {airport.country}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                )}
               </select>
             </div>
             {errors.origin && (
@@ -208,7 +446,7 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
           <div className="search-field">
             <label htmlFor="dest-airport" className="field-label">
               <PlaneLanding size={15} className="field-icon" />
-              <span>To Airport</span>
+              <span>To ({flightCategory === 'domestic' ? 'India' : 'Destination'})</span>
             </label>
             <div className={`field-input-box ${errors.destination ? 'has-error' : ''}`}>
               <select
@@ -222,11 +460,30 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
                   }
                 }}
               >
-                {AIRPORTS.map((airport) => (
-                  <option key={`to-${airport.code}`} value={airport.code}>
-                    {airport.flag} {airport.city} ({airport.code})
-                  </option>
-                ))}
+                {flightCategory === 'domestic' ? (
+                  destinationAirportList.map((airport) => (
+                    <option key={`to-${airport.code}`} value={airport.code}>
+                      {airport.flag} {airport.city} ({airport.code})
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <optgroup label="── International Destinations ──">
+                      {INTERNATIONAL_AIRPORTS.map((airport) => (
+                        <option key={`to-int-${airport.code}`} value={airport.code}>
+                          {airport.flag} {airport.city} ({airport.code}) - {airport.country}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="── Indian Hubs (Inbound) ──">
+                      {DOMESTIC_AIRPORTS.map((airport) => (
+                        <option key={`to-in-${airport.code}`} value={airport.code}>
+                          {airport.flag} {airport.city} ({airport.code})
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                )}
               </select>
             </div>
             {errors.destination && (
@@ -254,7 +511,6 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
                   if (errors.departureDate) {
                     setErrors((prev) => ({ ...prev, departureDate: null }));
                   }
-                  // If return date is now earlier than departure date, update it
                   if (returnDate && returnDate < e.target.value) {
                     setReturnDate(e.target.value);
                   }
@@ -309,13 +565,13 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
           </div>
         </div>
 
-        {/* Secondary Row: Adults/Passengers + Cabin Class + Search Button */}
+        {/* Secondary Row: Adults/Passengers + Cabin Class + Submit Button */}
         <div className="search-secondary-row">
           {/* Adults / Passengers count */}
           <div className="search-field">
             <label htmlFor="passenger-count" className="field-label">
               <Users size={15} className="field-icon" />
-              <span>Passengers (Adults)</span>
+              <span>Travellers</span>
             </label>
             <div className="field-input-box">
               <select
@@ -324,11 +580,12 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
                 value={passengers}
                 onChange={(e) => setPassengers(Number(e.target.value))}
               >
-                <option value={1}>1 Adult (Age 12+)</option>
-                <option value={2}>2 Adults</option>
-                <option value={3}>3 Adults</option>
-                <option value={4}>4 Adults</option>
-                <option value={5}>5 Adults</option>
+                <option value={1}>1 Traveller (Adult)</option>
+                <option value={2}>2 Travellers</option>
+                <option value={3}>3 Travellers</option>
+                <option value={4}>4 Travellers</option>
+                <option value={5}>5 Travellers</option>
+                <option value={6}>6 Travellers</option>
               </select>
             </div>
           </div>
@@ -337,7 +594,7 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
           <div className="search-field">
             <label htmlFor="cabin-class" className="field-label">
               <Briefcase size={15} className="field-icon" />
-              <span>Cabin Class</span>
+              <span>Class of Travel</span>
             </label>
             <div className="field-input-box">
               <select
@@ -348,7 +605,7 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
               >
                 <option value="Economy">Economy</option>
                 <option value="Premium Economy">Premium Economy</option>
-                <option value="Business">Business</option>
+                <option value="Business">Business Class</option>
                 <option value="First">First Class</option>
               </select>
             </div>
@@ -362,7 +619,7 @@ export default function FlightSearchForm({ initialValues = {}, onSearch = null, 
               id="search-flights-submit"
             >
               <Search size={18} />
-              <span>Search Flights</span>
+              <span>Search {flightCategory === 'domestic' ? 'Domestic' : 'International'} Flights</span>
             </button>
           </div>
         </div>

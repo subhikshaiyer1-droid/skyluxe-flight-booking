@@ -11,7 +11,9 @@ import {
   TrendingDown,
   Zap,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Award,
+  Armchair
 } from 'lucide-react';
 
 export default function FlightCompareModal({
@@ -27,7 +29,7 @@ export default function FlightCompareModal({
 
   const passengerCount = Number(searchParams.passengers || 1);
 
-  // Identify min price and min duration among the compared flights
+  // Identify min price and min duration among compared flights
   const minPrice = Math.min(...flights.map((f) => f.price));
   const minDuration = Math.min(...flights.map((f) => f.durationMinutes));
 
@@ -45,12 +47,12 @@ export default function FlightCompareModal({
     <div className="planner-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div
         className="planner-modal-container"
-        style={{ maxWidth: '960px' }}
+        style={{ maxWidth: '980px', width: '95%' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{
-          padding: '24px 28px',
+          padding: '22px 28px',
           borderBottom: '1px solid var(--color-border-subtle)',
           display: 'flex',
           alignItems: 'center',
@@ -77,84 +79,93 @@ export default function FlightCompareModal({
         </div>
 
         {/* Comparison Grid */}
-        <div style={{ padding: '28px', overflowX: 'auto' }}>
+        <div style={{ padding: '24px 28px', overflowX: 'auto' }}>
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: `160px repeat(${flights.length}, minmax(220px, 1fr))`,
+              gridTemplateColumns: `170px repeat(${flights.length}, minmax(230px, 1fr))`,
               gap: '16px',
-              minWidth: flights.length > 2 ? '780px' : 'auto'
+              minWidth: flights.length > 2 ? '820px' : 'auto'
             }}
           >
             {/* Row 1: Header / Airline */}
             <div style={{ fontWeight: 700, color: 'var(--color-navy)', paddingTop: '12px' }}>
-              Airline & Flight
+              Airline & Aircraft
             </div>
-            {flights.map((flight) => (
-              <div
-                key={flight.id}
-                style={{
-                  background: 'var(--color-bg-light)',
-                  padding: '16px',
-                  borderRadius: 'var(--radius-md)',
-                  position: 'relative'
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => onRemoveFlight(flight.id)}
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    background: 'none',
-                    color: 'var(--color-text-light)',
-                    padding: '4px'
-                  }}
-                  title="Remove from comparison"
-                >
-                  <X size={16} />
-                </button>
+            {flights.map((flight) => {
+              const isBestPrice = flight.price === minPrice;
+              const isShortest = flight.durationMinutes === minDuration;
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <div
-                    className="airline-logo-badge"
+              return (
+                <div
+                  key={flight.id}
+                  style={{
+                    background: 'var(--color-bg-light)',
+                    padding: '16px',
+                    borderRadius: 'var(--radius-md)',
+                    position: 'relative'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onRemoveFlight(flight.id)}
                     style={{
-                      width: '36px',
-                      height: '36px',
-                      fontSize: '0.85rem',
-                      backgroundColor: flight.airlineBgLight,
-                      color: flight.airlineColor
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--color-text-light)',
+                      padding: '4px',
+                      cursor: 'pointer'
                     }}
+                    title="Remove flight from comparison"
                   >
-                    {flight.airlineCode}
+                    <X size={16} />
+                  </button>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <div
+                      className="airline-logo-badge"
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        fontSize: '0.85rem',
+                        backgroundColor: flight.airlineBgLight || '#EBF3FF',
+                        color: flight.airlineColor || 'var(--color-primary)'
+                      }}
+                    >
+                      {flight.airlineCode}
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '0.95rem', color: 'var(--color-navy)', margin: 0 }}>
+                        {flight.airline}
+                      </h4>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
+                        {flight.flightNumber}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <h4 style={{ fontSize: '0.95rem', color: 'var(--color-navy)', margin: 0 }}>
-                      {flight.airline}
-                    </h4>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
-                      #{flight.flightNumber}
-                    </span>
+
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                    {isBestPrice && (
+                      <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>
+                        🏆 Best Value
+                      </span>
+                    )}
+                    {isShortest && (
+                      <span className="badge badge-orange" style={{ fontSize: '0.7rem' }}>
+                        ⚡ Fastest Route
+                      </span>
+                    )}
                   </div>
                 </div>
+              );
+            })}
 
-                {flight.price === minPrice && (
-                  <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>
-                    <TrendingDown size={11} /> Lowest Price
-                  </span>
-                )}
-                {flight.durationMinutes === minDuration && (
-                  <span className="badge badge-orange" style={{ fontSize: '0.7rem', marginLeft: '4px' }}>
-                    <Zap size={11} /> Fastest
-                  </span>
-                )}
-              </div>
-            ))}
-
-            {/* Row 2: Price */}
+            {/* Row 2: Total Fare */}
             <div style={{ fontWeight: 600, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center' }}>
-              Ticket Price
+              Total Fare
             </div>
             {flights.map((flight) => {
               const isBestPrice = flight.price === minPrice;
@@ -180,7 +191,7 @@ export default function FlightCompareModal({
 
             {/* Row 3: Timings */}
             <div style={{ fontWeight: 600, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center' }}>
-              Departure & Arrival
+              Times & Timezone
             </div>
             {flights.map((flight) => (
               <div
@@ -193,17 +204,23 @@ export default function FlightCompareModal({
                 }}
               >
                 <div style={{ fontWeight: 700, color: 'var(--color-navy)', fontSize: '0.95rem' }}>
-                  {flight.departureTime} → {flight.arrivalTime} {flight.isNextDay && <sup style={{ color: 'var(--color-orange)' }}>+1</sup>}
+                  {flight.departureTime} → {flight.arrivalTime}{' '}
+                  {flight.isNextDay && <sup style={{ color: 'var(--color-orange)', fontWeight: 700 }}>+1</sup>}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                   {flight.fromAirport} to {flight.toAirport}
                 </div>
+                {flight.tzDiffDisplay && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-light)', marginTop: '2px' }}>
+                    {flight.tzDiffDisplay}
+                  </div>
+                )}
               </div>
             ))}
 
-            {/* Row 4: Duration */}
+            {/* Row 4: Duration & Stops */}
             <div style={{ fontWeight: 600, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center' }}>
-              Total Duration
+              Duration & Stops
             </div>
             {flights.map((flight) => {
               const isFastest = flight.durationMinutes === minDuration;
@@ -229,7 +246,7 @@ export default function FlightCompareModal({
 
             {/* Row 5: Baggage */}
             <div style={{ fontWeight: 600, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center' }}>
-              Baggage
+              Baggage Allowance
             </div>
             {flights.map((flight) => (
               <div
@@ -248,33 +265,61 @@ export default function FlightCompareModal({
               </div>
             ))}
 
-            {/* Row 6: Aircraft & Amenities */}
+            {/* Row 6: Seat Selection Options */}
             <div style={{ fontWeight: 600, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center' }}>
-              Amenities
+              Seat Selection
             </div>
             {flights.map((flight) => (
               <div
-                key={`amen-${flight.id}`}
+                key={`seat-${flight.id}`}
                 style={{
                   padding: '12px 14px',
                   borderRadius: 'var(--radius-sm)',
                   background: 'white',
                   border: '1px solid var(--color-border-subtle)',
                   fontSize: '0.8rem',
-                  color: 'var(--color-text-muted)',
-                  lineHeight: '1.5'
+                  color: 'var(--color-navy)'
                 }}
               >
-                <div>✈️ {flight.aircraft}</div>
-                {flight.amenities && (
-                  <div style={{ marginTop: '4px', color: 'var(--color-navy)', fontWeight: 500 }}>
-                    • {flight.amenities.join(', ')}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+                  <Armchair size={14} color="var(--color-primary)" />
+                  <span>Interactive Seat Map</span>
+                </div>
+                <div style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  Window, Aisle & Extra Legroom options available
+                </div>
+              </div>
+            ))}
+
+            {/* Row 7: Refund or Change Policy */}
+            <div style={{ fontWeight: 600, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center' }}>
+              Change & Refund Policy
+            </div>
+            {flights.map((flight) => (
+              <div
+                key={`policy-${flight.id}`}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'white',
+                  border: '1px solid var(--color-border-subtle)',
+                  fontSize: '0.8rem'
+                }}
+              >
+                {flight.refundable ? (
+                  <div style={{ color: '#047857', fontWeight: 600 }}>
+                    <ShieldCheck size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                    Refundable (Change fee ₹{flight.changeFee?.toLocaleString('en-IN') || 1500})
+                  </div>
+                ) : (
+                  <div style={{ color: 'var(--color-text-muted)' }}>
+                    Non-refundable Saver Fare (Free reschedule within 24h)
                   </div>
                 )}
               </div>
             ))}
 
-            {/* Row 7: Action */}
+            {/* Row 8: Action Button */}
             <div></div>
             {flights.map((flight) => (
               <div key={`act-${flight.id}`} style={{ paddingTop: '8px' }}>
@@ -292,7 +337,7 @@ export default function FlightCompareModal({
           </div>
         </div>
 
-        {/* Footer Guidance Note */}
+        {/* Footer Note */}
         <div style={{
           padding: '16px 28px',
           background: 'var(--color-bg-light)',
@@ -303,9 +348,9 @@ export default function FlightCompareModal({
           fontSize: '0.82rem',
           color: 'var(--color-text-muted)'
         }}>
-          <AlertCircle size={15} color="var(--color-primary)" />
+          <AlertCircle size={15} color="var(--color-primary)" style={{ flexShrink: 0 }} />
           <span>
-            Fares are simulated demo quotes. Comparing allows you to weigh non-stop travel time vs layover fare savings before booking.
+            <strong>Winner Indicators:</strong> Badges indicate lowest fare and shortest journey time to help you weigh direct flight speed vs budget savings. Fares are simulated demo quotes.
           </span>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Heart,
@@ -10,15 +10,24 @@ import {
   Calendar,
   Luggage,
   Sparkles,
-  Bookmark
+  Bookmark,
+  Globe,
+  Tag
 } from 'lucide-react';
 import DestinationCard from '../components/DestinationCard';
+import { isDomesticRoute, getAirportByCode } from '../data/airports';
 
 export default function SavedItemsPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('destinations'); // 'destinations' | 'flights'
   const [savedDestinations, setSavedDestinations] = useState([]);
   const [savedFlights, setSavedFlights] = useState([]);
+
+  // Sub-filter for destinations: 'All' | 'India' | 'Asia' | 'Europe' | 'Middle East' | 'North America' | 'South America' | 'Africa' | 'Oceania'
+  const [destRegionFilter, setDestRegionFilter] = useState('All');
+
+  // Sub-filter for saved flights: 'all' | 'domestic' | 'international'
+  const [flightTypeFilter, setFlightTypeFilter] = useState('all');
 
   const loadSavedItems = () => {
     try {
@@ -76,8 +85,36 @@ export default function SavedItemsPage() {
     });
   };
 
+  // Filtered Saved Destinations by Region
+  const filteredSavedDestinations = useMemo(() => {
+    if (destRegionFilter === 'All') return savedDestinations;
+    return savedDestinations.filter(
+      (d) => (d.region || (d.country === 'India' ? 'India' : 'International')).toLowerCase() === destRegionFilter.toLowerCase()
+    );
+  }, [savedDestinations, destRegionFilter]);
+
+  // Filtered Saved Flights by Domestic vs International
+  const filteredSavedFlights = useMemo(() => {
+    return savedFlights.filter((flight) => {
+      const isDom = flight.isDomestic ?? isDomesticRoute(flight.fromAirport, flight.toAirport);
+      if (flightTypeFilter === 'domestic') return isDom;
+      if (flightTypeFilter === 'international') return !isDom;
+      return true;
+    });
+  }, [savedFlights, flightTypeFilter]);
+
+  // Unique regions present in saved destinations
+  const availableRegions = useMemo(() => {
+    const set = new Set();
+    savedDestinations.forEach((d) => {
+      if (d.region) set.add(d.region);
+      else if (d.country === 'India') set.add('India');
+    });
+    return Array.from(set);
+  }, [savedDestinations]);
+
   return (
-    <div className="section-pad" style={{ paddingTop: '40px' }}>
+    <div className="section-pad" style={{ paddingTop: '36px' }}>
       <div className="container">
         {/* Page Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
@@ -94,7 +131,7 @@ export default function SavedItemsPage() {
             </p>
           </div>
 
-          {/* Tab Selector */}
+          {/* Primary Tab Selector */}
           <div style={{ display: 'flex', gap: '8px', background: 'var(--color-white)', padding: '6px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
             <button
               type="button"
@@ -117,12 +154,36 @@ export default function SavedItemsPage() {
           </div>
         </div>
 
-        {/* Tab 1: Saved Destinations */}
+        {/* ================================================================
+            TAB 1: SAVED DESTINATIONS (with Region Grouping)
+            ================================================================ */}
         {activeTab === 'destinations' && (
           <div>
-            {savedDestinations.length > 0 ? (
+            {savedDestinations.length > 0 && availableRegions.length > 1 && (
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className={`trip-pill ${destRegionFilter === 'All' ? 'active' : ''}`}
+                  onClick={() => setDestRegionFilter('All')}
+                >
+                  All Regions ({savedDestinations.length})
+                </button>
+                {availableRegions.map((reg) => (
+                  <button
+                    key={reg}
+                    type="button"
+                    className={`trip-pill ${destRegionFilter === reg ? 'active' : ''}`}
+                    onClick={() => setDestRegionFilter(reg)}
+                  >
+                    {reg === 'India' ? '🇮🇳 India' : reg}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {filteredSavedDestinations.length > 0 ? (
               <div className="destinations-grid">
-                {savedDestinations.map((dest) => (
+                {filteredSavedDestinations.map((dest) => (
                   <DestinationCard
                     key={dest.id}
                     destination={dest}
@@ -146,96 +207,147 @@ export default function SavedItemsPage() {
                   <Heart size={32} color="#EF4444" />
                 </div>
                 <h3 style={{ fontSize: '1.25rem', color: 'var(--color-navy)', marginBottom: '8px' }}>
-                  No Saved Destinations Yet
+                  {savedDestinations.length === 0 ? 'No Saved Destinations Yet' : 'No destinations in this region'}
                 </h3>
                 <p style={{ color: 'var(--color-text-muted)', marginBottom: '20px', maxWidth: '420px', margin: '0 auto 20px' }}>
-                  Click the heart icon on any destination card to save it to your personal travel wishlist for later!
+                  {savedDestinations.length === 0
+                    ? 'Click the heart icon on any destination card to save it to your personal travel wishlist for later!'
+                    : 'Try selecting All Regions to see all your saved getaway spots.'}
                 </p>
                 <Link to="/destinations" className="btn btn-primary">
                   <Compass size={16} />
-                  <span>Browse All 44+ Destinations</span>
+                  <span>Browse Destination Catalogue</span>
                 </Link>
               </div>
             )}
           </div>
         )}
 
-        {/* Tab 2: Saved Flights */}
+        {/* ================================================================
+            TAB 2: SAVED FLIGHTS (Separating Domestic vs International)
+            ================================================================ */}
         {activeTab === 'flights' && (
           <div>
-            {savedFlights.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {savedFlights.map((flight) => (
-                  <div key={flight.id} className="flight-card">
-                    {/* Airline */}
-                    <div className="flight-airline-info">
-                      <div
-                        className="airline-logo-badge"
-                        style={{
-                          backgroundColor: flight.airlineBgLight || '#EBF3FF',
-                          color: flight.airlineColor || 'var(--color-primary)'
-                        }}
-                      >
-                        {flight.airlineCode}
-                      </div>
-                      <div>
-                        <h4 className="airline-name">{flight.airline}</h4>
-                        <span className="flight-number">{flight.flightNumber} • {flight.cabinClass || 'Economy'}</span>
-                      </div>
-                    </div>
+            {savedFlights.length > 0 && (
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className={`trip-pill ${flightTypeFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setFlightTypeFilter('all')}
+                >
+                  All Saved Flights ({savedFlights.length})
+                </button>
+                <button
+                  type="button"
+                  className={`trip-pill ${flightTypeFilter === 'domestic' ? 'active' : ''}`}
+                  onClick={() => setFlightTypeFilter('domestic')}
+                >
+                  🇮🇳 Domestic Flights
+                </button>
+                <button
+                  type="button"
+                  className={`trip-pill ${flightTypeFilter === 'international' ? 'active' : ''}`}
+                  onClick={() => setFlightTypeFilter('international')}
+                >
+                  🌐 International Flights
+                </button>
+              </div>
+            )}
 
-                    {/* Timeline */}
-                    <div className="flight-timeline">
-                      <div className="timeline-point">
-                        <div className="timeline-time">{flight.departureTime}</div>
-                        <div className="timeline-city">{flight.fromAirport}</div>
-                      </div>
-                      <div className="timeline-path">
-                        <span className="flight-duration-text">{flight.duration}</span>
-                        <div className="timeline-line">
-                          <span className="timeline-plane-icon">
-                            <Plane size={15} style={{ transform: 'rotate(90deg)' }} />
+            {filteredSavedFlights.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {filteredSavedFlights.map((flight) => {
+                  const isDom = flight.isDomestic ?? isDomesticRoute(flight.fromAirport, flight.toAirport);
+                  const fromAirport = getAirportByCode(flight.fromAirport);
+                  const toAirport = getAirportByCode(flight.toAirport);
+
+                  return (
+                    <div key={flight.id} className="flight-card">
+                      {/* Airline */}
+                      <div className="flight-airline-info">
+                        <div
+                          className="airline-logo-badge"
+                          style={{
+                            backgroundColor: flight.airlineBgLight || '#EBF3FF',
+                            color: flight.airlineColor || 'var(--color-primary)'
+                          }}
+                        >
+                          {flight.airlineCode}
+                        </div>
+                        <div>
+                          <h4 className="airline-name">{flight.airline}</h4>
+                          <span className="flight-number">{flight.flightNumber} • {flight.cabinClass || 'Economy'}</span>
+                          <span
+                            className="badge"
+                            style={{
+                              display: 'inline-block',
+                              marginTop: '4px',
+                              fontSize: '0.68rem',
+                              background: isDom ? '#E8F1FC' : '#F3E8FF',
+                              color: isDom ? 'var(--color-primary)' : '#6B21A8'
+                            }}
+                          >
+                            {isDom ? 'Domestic India' : 'International'}
                           </span>
                         </div>
-                        <span className="badge badge-primary flight-stop-badge">
-                          {flight.stopDetails}
-                        </span>
                       </div>
-                      <div className="timeline-point">
-                        <div className="timeline-time">{flight.arrivalTime}</div>
-                        <div className="timeline-city">{flight.toAirport}</div>
+
+                      {/* Timeline */}
+                      <div className="flight-timeline">
+                        <div className="timeline-point">
+                          <div className="timeline-time">{flight.departureTime}</div>
+                          <div className="timeline-city">{fromAirport.city} ({fromAirport.code})</div>
+                        </div>
+                        <div className="timeline-path">
+                          <span className="flight-duration-text">{flight.duration}</span>
+                          <div className="timeline-line">
+                            <span className="timeline-plane-icon">
+                              <Plane size={15} style={{ transform: 'rotate(90deg)' }} />
+                            </span>
+                          </div>
+                          <span className="badge badge-primary flight-stop-badge">
+                            {flight.stopDetails}
+                          </span>
+                        </div>
+                        <div className="timeline-point">
+                          <div className="timeline-time">
+                            {flight.arrivalTime}
+                            {flight.isNextDay && <sup style={{ color: 'var(--color-orange)' }}>+1</sup>}
+                          </div>
+                          <div className="timeline-city">{toAirport.city} ({toAirport.code})</div>
+                        </div>
+                      </div>
+
+                      {/* Price & Actions */}
+                      <div className="flight-price-box">
+                        <div className="flight-price-amount">
+                          ₹{flight.price.toLocaleString('en-IN')}
+                        </div>
+                        <div className="flight-price-subtext">Estimated fare per adult</div>
+
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleRemoveFlight(flight.id)}
+                            style={{ color: '#EF4444', borderColor: '#FCA5A5' }}
+                            title="Remove from saved flights"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() => handleBookSavedFlight(flight)}
+                          >
+                            <span>Book Flight</span>
+                            <ArrowRight size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    {/* Price & Actions */}
-                    <div className="flight-price-box">
-                      <div className="flight-price-amount">
-                        ₹{flight.price.toLocaleString('en-IN')}
-                      </div>
-                      <div className="flight-price-subtext">Base demo fare per passenger</div>
-
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ color: '#EF4444', borderColor: '#FCA5A5' }}
-                          onClick={() => handleRemoveFlight(flight.id)}
-                          title="Remove from saved flights"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => handleBookSavedFlight(flight)}
-                        >
-                          <span>Select & Book</span>
-                          <ArrowRight size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="empty-results-card">
@@ -250,13 +362,15 @@ export default function SavedItemsPage() {
                   justifyContent: 'center',
                   margin: '0 auto 16px'
                 }}>
-                  <Plane size={32} color="var(--color-primary)" />
+                  <Plane size={32} />
                 </div>
                 <h3 style={{ fontSize: '1.25rem', color: 'var(--color-navy)', marginBottom: '8px' }}>
-                  No Saved Flights Yet
+                  {savedFlights.length === 0 ? 'No Saved Flights Yet' : 'No flights in this category'}
                 </h3>
                 <p style={{ color: 'var(--color-text-muted)', marginBottom: '20px', maxWidth: '420px', margin: '0 auto 20px' }}>
-                  When searching for flights, click the heart icon on any flight card to bookmark it here for easy comparison and booking.
+                  {savedFlights.length === 0
+                    ? 'Search flights and tap the heart icon on any card to save it here for quick access later.'
+                    : 'Try viewing All Saved Flights to review your bookmarks.'}
                 </p>
                 <Link to="/search" className="btn btn-primary">
                   <Plane size={16} />

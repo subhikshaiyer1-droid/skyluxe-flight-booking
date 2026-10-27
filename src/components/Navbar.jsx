@@ -11,7 +11,10 @@ import {
   Home,
   Heart,
   Clock,
-  User
+  User,
+  Calculator,
+  DollarSign,
+  Map
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -89,7 +92,7 @@ export default function Navbar() {
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                   end
                 >
-                  <Home size={17} />
+                  <Home size={16} />
                   <span>Home</span>
                 </NavLink>
               </li>
@@ -98,8 +101,17 @@ export default function Navbar() {
                   to="/search"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <Search size={17} />
+                  <Search size={16} />
                   <span>Flights</span>
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/multi-city"
+                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                >
+                  <Map size={16} />
+                  <span>Multi-City</span>
                 </NavLink>
               </li>
               <li>
@@ -107,8 +119,26 @@ export default function Navbar() {
                   to="/destinations"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <Compass size={17} />
+                  <Compass size={16} />
                   <span>Destinations</span>
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/trip-planner"
+                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                >
+                  <Calculator size={16} />
+                  <span>Budget</span>
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/currency-converter"
+                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                >
+                  <DollarSign size={16} />
+                  <span>Currency</span>
                 </NavLink>
               </li>
               <li>
@@ -116,7 +146,7 @@ export default function Navbar() {
                   to="/saved"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <Heart size={17} />
+                  <Heart size={16} />
                   <span>Wishlist</span>
                   {savedCount > 0 && (
                     <span className="bookings-badge" style={{ background: '#EF4444' }} title={`${savedCount} saved items`}>
@@ -127,20 +157,11 @@ export default function Navbar() {
               </li>
               <li>
                 <NavLink
-                  to="/flight-status"
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                >
-                  <Clock size={17} />
-                  <span>Flight Status</span>
-                </NavLink>
-              </li>
-              <li>
-                <NavLink
                   to="/my-bookings"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <BookmarkCheck size={17} />
-                  <span>My Bookings</span>
+                  <BookmarkCheck size={16} />
+                  <span>Bookings</span>
                   {activeBookingCount > 0 && (
                     <span className="bookings-badge" title={`${activeBookingCount} active bookings`}>
                       {activeBookingCount}
@@ -153,7 +174,7 @@ export default function Navbar() {
                   to="/profile"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <User size={17} />
+                  <User size={16} />
                   <span>Profile</span>
                 </NavLink>
               </li>
@@ -162,7 +183,7 @@ export default function Navbar() {
                   to="/about"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <Info size={17} />
+                  <Info size={16} />
                   <span>About</span>
                 </NavLink>
               </li>

@@ -1961,3 +1961,654 @@
   line-height: 1.3;
 }
 
+/* ==========================================================================
+   20. Recently Searched Routes Bar & Quick Route Cards
+   ========================================================================== */
+.recent-searches-bar {
+  background: var(--color-bg-light);
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 12px 0;
+}
+
+.recent-searches-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.recent-chips-list {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.recent-search-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  color: var(--color-navy);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.recent-search-chip:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  transform: translateY(-1px);
+}
+
+.recent-chip-sub {
+  font-size: 0.72rem;
+  color: var(--color-text-light);
+}
+
+.btn-clear-recent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--color-text-light);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.btn-clear-recent:hover {
+  color: var(--color-danger);
+}
+
+.section-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.route-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.quick-route-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.quick-route-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+}
+
+.quick-route-card-intl {
+  border-top: 3px solid var(--color-orange);
+}
+
+.quick-route-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.quick-route-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  text-transform: uppercase;
+}
+
+.quick-route-tag.intl-tag {
+  background: var(--color-orange-light);
+  color: var(--color-orange);
+}
+
+.quick-route-time {
+  font-size: 0.78rem;
+  color: var(--color-text-light);
+  font-weight: 500;
+}
+
+.quick-route-endpoints {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.route-city-code {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--color-navy);
+  line-height: 1.1;
+}
+
+.route-city-name {
+  font-size: 0.8rem;
+  color: var(--color-text-light);
+}
+
+.route-arrow-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-bg-light);
+}
+
+.quick-route-footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px dashed var(--color-border-subtle);
+}
+
+.quick-route-fare {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+/* ==========================================================================
+   21. Smart Travel Tools Showcase
+   ========================================================================== */
+.tools-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.tool-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  transition: all var(--transition-normal);
+}
+
+.tool-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-4px);
+}
+
+.tool-icon-box {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.tool-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--color-navy);
+  margin-bottom: 8px;
+}
+
+.tool-desc {
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+/* ==========================================================================
+   22. Multi-City Trip Planner Styles
+   ========================================================================== */
+.multi-city-page {
+  background: var(--color-bg-light);
+  min-height: 80vh;
+}
+
+.planner-presets-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.preset-buttons-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.preset-pill {
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  padding: 6px 14px;
+}
+
+.preset-pill-sub {
+  color: var(--color-text-light);
+  font-size: 0.72rem;
+}
+
+.planner-layout-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr;
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 992px) {
+  .planner-layout-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stops-builder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stop-builder-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  transition: all var(--transition-fast);
+}
+
+.stop-builder-row:hover {
+  border-color: var(--color-primary-light);
+  background: #F4F8FD;
+}
+
+.stop-index-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stop-badge-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-navy);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stop-inputs-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 10px;
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .stop-inputs-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stop-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-icon-subtle {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-icon-subtle:hover:not(:disabled) {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.btn-icon-subtle:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-icon-danger:hover:not(:disabled) {
+  background: #FEE2E2 !important;
+  color: var(--color-danger) !important;
+  border-color: var(--color-danger) !important;
+}
+
+.saved-plans-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.saved-plan-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.saved-plan-chip:hover {
+  border-color: var(--color-primary);
+  background: #F4F8FD;
+}
+
+.planner-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+
+.itinerary-legs-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+}
+
+.itinerary-leg-card {
+  display: flex;
+  gap: 14px;
+  position: relative;
+}
+
+.leg-left-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 50px;
+  flex-shrink: 0;
+}
+
+.leg-number-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  padding: 3px 6px;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+
+.leg-connector-line {
+  flex: 1;
+  width: 2px;
+  background: var(--color-border);
+  margin-top: 6px;
+}
+
+.leg-card-body {
+  flex: 1;
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  transition: all var(--transition-fast);
+}
+
+.leg-card-body:hover {
+  border-color: var(--color-primary);
+  background: #FFFFFF;
+  box-shadow: var(--shadow-sm);
+}
+
+.leg-route-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-navy);
+  margin-bottom: 8px;
+}
+
+.leg-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.leg-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.leg-fare-highlight {
+  font-weight: 700;
+  color: var(--color-orange);
+  background: var(--color-orange-light);
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+}
+
+.leg-search-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   23. Currency Converter Styles
+   ========================================================================== */
+.currency-page {
+  background: var(--color-bg-light);
+  min-height: 80vh;
+}
+
+.currency-converter-card {
+  max-width: 820px;
+  margin: 0 auto;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 36px 32px;
+  box-shadow: var(--shadow-md);
+}
+
+.converter-form-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1.3fr auto 1.3fr;
+  gap: 14px;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .converter-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.currency-big-input {
+  font-size: 1.25rem !important;
+  font-weight: 800;
+  color: var(--color-navy);
+  padding-right: 40px !important;
+}
+
+.currency-input-badge {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-light);
+  pointer-events: none;
+}
+
+.converter-swap-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 2px;
+}
+
+.btn-currency-swap {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-light);
+  color: var(--color-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-currency-swap:hover {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+  transform: rotate(180deg);
+}
+
+.currency-quick-amounts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.quick-amount-pill {
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.quick-amount-pill:hover,
+.quick-amount-pill.active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.conversion-result-banner {
+  background: linear-gradient(135deg, var(--color-navy) 0%, #173d6f 100%);
+  color: white;
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.result-subtext {
+  font-size: 1rem;
+  color: #C0D6EF;
+  margin-bottom: 6px;
+}
+
+.result-main-value {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: var(--color-orange);
+  margin-bottom: 10px;
+  line-height: 1.2;
+}
+
+.result-rate-formula {
+  font-size: 0.85rem;
+  color: #A3C4E8;
+}
+
+.currency-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.currency-table th,
+.currency-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.currency-table th {
+  background: var(--color-bg-light);
+  color: var(--color-navy);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.currency-table tr:hover {
+  background: #F9FBFE;
+}
+
+.currency-table tr.row-highlight {
+  background: var(--color-primary-light);
+}
+
+

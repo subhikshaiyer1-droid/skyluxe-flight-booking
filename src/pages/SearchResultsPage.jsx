@@ -4,7 +4,7 @@ import FlightCard from '../components/FlightCard';
 import FlightSearchForm from '../components/FlightSearchForm';
 import FlightCompareModal from '../components/FlightCompareModal';
 import { getFlightsForRoute, getFlexibleDateFares } from '../data/flights';
-import { getAirportByCode } from '../data/airports';
+import { getAirportByCode, isDomesticRoute } from '../data/airports';
 import {
   Plane,
   ArrowRight,
@@ -21,6 +21,11 @@ import {
   Layers,
   Sparkles,
   TrendingDown,
+  Globe,
+  Clock,
+  Luggage,
+  ShieldCheck,
+  CheckCircle2,
   X
 } from 'lucide-react';
 
@@ -39,6 +44,7 @@ export default function SearchResultsPage() {
 
   const fromAirport = getAirportByCode(fromCode);
   const toAirport = getAirportByCode(toCode);
+  const isDomestic = isDomesticRoute(fromCode, toCode);
 
   // Toggle collapsible "Modify Search" panel
   const [showModifySearch, setShowModifySearch] = useState(false);
@@ -55,12 +61,40 @@ export default function SearchResultsPage() {
   // Determine price limits for slider
   const prices = baseFlights.map((f) => f.price);
   const minPossiblePrice = prices.length > 0 ? Math.min(...prices) : 1000;
-  const maxPossiblePrice = prices.length > 0 ? Math.max(...prices) : 50000;
+  const maxPossiblePrice = prices.length > 0 ? Math.max(...prices) : 80000;
 
-  // Filter States
+  // Determine duration limits in hours
+  const durations = baseFlights.map((f) => f.durationMinutes);
+  const maxPossibleDurationHours = durations.length > 0
+    ? Math.ceil(Math.max(...durations) / 60)
+    : 24;
+
+  // ----------------------------------------------------
+  // FILTER STATES (Section 4 Requirements)
+  // ----------------------------------------------------
   const [selectedSort, setSelectedSort] = useState('cheapest'); // 'cheapest' | 'fastest' | 'earliest'
-  const [maxPrice, setMaxPrice] = useState(maxPossiblePrice);
-  const [nonStopOnly, setNonStopOnly] = useState(false);
+  const [minPriceFilter, setMinPriceFilter] = useState(minPossiblePrice);
+  const [maxPriceFilter, setMaxPriceFilter] = useState(maxPossiblePrice);
+
+  // Stops: 'all' | 'nonStop' | 'oneStop'
+  const [stopsFilter, setStopsFilter] = useState('all');
+
+  // Departure Time Windows: Array of strings e.g. ['morning', 'evening']
+  const [selectedDepTimes, setSelectedDepTimes] = useState([]);
+
+  // Arrival Time Windows: Array of strings
+  const [selectedArrTimes, setSelectedArrTimes] = useState([]);
+
+  // Max Duration Filter (in hours)
+  const [maxDurationHours, setMaxDurationHours] = useState(maxPossibleDurationHours);
+
+  // Baggage Allowance Filter: 'all' | '15kg' | '20kg' | '25kg' | '30kg'
+  const [baggageFilter, setBaggageFilter] = useState('all');
+
+  // Refundable or Flexible Fare only
+  const [refundableOnly, setRefundableOnly] = useState(false);
+
+  // Airline Checkbox Filters
   const [selectedAirlines, setSelectedAirlines] = useState([]);
 
   // Flexible Date Prices
@@ -75,10 +109,16 @@ export default function SearchResultsPage() {
     setSearchParams(updated);
   };
 
-  // Reset filters
+  // Reset all filters back to default
   const handleResetFilters = () => {
-    setMaxPrice(maxPossiblePrice);
-    setNonStopOnly(false);
+    setMinPriceFilter(minPossiblePrice);
+    setMaxPriceFilter(maxPossiblePrice);
+    setStopsFilter('all');
+    setSelectedDepTimes([]);
+    setSelectedArrTimes([]);
+    setMaxDurationHours(maxPossibleDurationHours);
+    setBaggageFilter('all');
+    setRefundableOnly(false);
     setSelectedAirlines([]);
     setSelectedSort('cheapest');
   };
@@ -90,6 +130,41 @@ export default function SearchResultsPage() {
         ? prev.filter((a) => a !== airlineName)
         : [...prev, airlineName]
     );
+  };
+
+  // Toggle departure time window
+  const handleDepTimeToggle = (windowKey) => {
+    setSelectedDepTimes((prev) =>
+      prev.includes(windowKey)
+        ? prev.filter((w) => w !== windowKey)
+        : [...prev, windowKey]
+    );
+  };
+
+  // Toggle arrival time window
+  const handleArrTimeToggle = (windowKey) => {
+    setSelectedArrTimes((prev) =>
+      prev.includes(windowKey)
+        ? prev.filter((w) => w !== windowKey)
+        : [...prev, windowKey]
+    );
+  };
+
+  // Cabin Class Change
+  const handleCabinClassChange = (newClass) => {
+    const updated = new URLSearchParams(searchParams);
+    updated.set('cabinClass', newClass);
+    setSearchParams(updated);
+  };
+
+  // Helper to categorize time string "HH:MM" into window
+  const getTimeWindow = (timeStr) => {
+    if (!timeStr) return 'morning';
+    const hour = parseInt(timeStr.split(':')[0], 10);
+    if (hour >= 6 && hour < 12) return 'morning'; // 06:00 - 11:59
+    if (hour >= 12 && hour < 18) return 'afternoon'; // 12:00 - 17:59
+    if (hour >= 18 && hour < 22) return 'evening'; // 18:00 - 21:59
+    return 'night'; // 22:00 - 05:59
   };
 
   // Compare flight toggle
@@ -111,24 +186,76 @@ export default function SearchResultsPage() {
     setComparedFlights((prev) => prev.filter((f) => f.id !== flightId));
   };
 
-  // Filter and sort the flights dynamically
+  // Available airlines list with counts
+  const availableAirlines = useMemo(() => {
+    const map = new Map();
+    baseFlights.forEach((f) => {
+      map.set(f.airline, (map.get(f.airline) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count }));
+  }, [baseFlights]);
+
+  // ----------------------------------------------------
+  // DYNAMIC FILTERING AND SORTING
+  // ----------------------------------------------------
   const filteredAndSortedFlights = useMemo(() => {
     let result = [...baseFlights];
 
-    // Filter by max price
-    result = result.filter((f) => f.price <= maxPrice);
+    // 1. Price Range filter
+    result = result.filter(
+      (f) => f.price >= minPriceFilter && f.price <= maxPriceFilter
+    );
 
-    // Filter by non-stop
-    if (nonStopOnly) {
+    // 2. Stops filter
+    if (stopsFilter === 'nonStop') {
       result = result.filter((f) => f.stops === 0);
+    } else if (stopsFilter === 'oneStop') {
+      result = result.filter((f) => f.stops === 1);
     }
 
-    // Filter by airlines
+    // 3. Departure Time Window filter
+    if (selectedDepTimes.length > 0) {
+      result = result.filter((f) =>
+        selectedDepTimes.includes(getTimeWindow(f.departureTime))
+      );
+    }
+
+    // 4. Arrival Time Window filter
+    if (selectedArrTimes.length > 0) {
+      result = result.filter((f) =>
+        selectedArrTimes.includes(getTimeWindow(f.arrivalTime))
+      );
+    }
+
+    // 5. Max Duration filter
+    result = result.filter(
+      (f) => f.durationMinutes <= maxDurationHours * 60
+    );
+
+    // 6. Baggage Allowance filter
+    if (baggageFilter !== 'all') {
+      const minKg = parseInt(baggageFilter, 10);
+      result = result.filter((f) => {
+        const match = f.baggage?.match(/(\d+)kg Check-in/i);
+        if (match) {
+          const kg = parseInt(match[1], 10);
+          return kg >= minKg;
+        }
+        return true;
+      });
+    }
+
+    // 7. Refundable / Flexible filter
+    if (refundableOnly) {
+      result = result.filter((f) => Boolean(f.refundable));
+    }
+
+    // 8. Airline filter
     if (selectedAirlines.length > 0) {
       result = result.filter((f) => selectedAirlines.includes(f.airline));
     }
 
-    // Sort flights
+    // 9. Sorting
     if (selectedSort === 'cheapest') {
       result.sort((a, b) => a.price - b.price);
     } else if (selectedSort === 'fastest') {
@@ -138,7 +265,19 @@ export default function SearchResultsPage() {
     }
 
     return result;
-  }, [baseFlights, maxPrice, nonStopOnly, selectedAirlines, selectedSort]);
+  }, [
+    baseFlights,
+    minPriceFilter,
+    maxPriceFilter,
+    stopsFilter,
+    selectedDepTimes,
+    selectedArrTimes,
+    maxDurationHours,
+    baggageFilter,
+    refundableOnly,
+    selectedAirlines,
+    selectedSort
+  ]);
 
   // Identify absolute cheapest and fastest flights in current results
   const cheapestFlightId = useMemo(() => {
@@ -159,29 +298,41 @@ export default function SearchResultsPage() {
     return fastF.id;
   }, [filteredAndSortedFlights]);
 
-  // Available airlines list
-  const availableAirlines = useMemo(() => {
-    const map = new Map();
-    baseFlights.forEach((f) => {
-      map.set(f.airline, (map.get(f.airline) || 0) + 1);
-    });
-    return Array.from(map.entries()).map(([name, count]) => ({ name, count }));
-  }, [baseFlights]);
-
   return (
     <div className="search-results-page">
       {/* --------------------------------------------------------------------
-          1. Header Route Summary Bar
+          1. Header Route Summary Bar with Domestic / International Badge
           -------------------------------------------------------------------- */}
       <div className="results-page-header">
         <div className="container">
+          {/* Domestic / International Journey Indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span
+              className="badge"
+              style={{
+                background: isDomestic ? 'rgba(38, 132, 255, 0.15)' : 'rgba(147, 51, 234, 0.15)',
+                color: isDomestic ? 'var(--color-primary)' : '#7E22CE',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                padding: '5px 12px'
+              }}
+            >
+              {isDomestic ? '🇮🇳 Domestic Flight (Within India)' : '🌐 International Flight'}
+            </span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+              {isDomestic
+                ? 'Standard Domestic Check-in • Government ID Required'
+                : `Local Timezone: ${toAirport?.timezone || 'Destination Local'} • Passport Required`}
+            </span>
+          </div>
+
           <div className="route-summary-bar">
             <div className="route-info-left">
               <div>
                 <h1 className="route-airports-title">
-                  <span>{fromAirport.city} ({fromAirport.code})</span>
+                  <span>{fromAirport?.flag} {fromAirport?.city} ({fromAirport?.code})</span>
                   <ArrowRight size={22} color="var(--color-primary)" />
-                  <span>{toAirport.city} ({toAirport.code})</span>
+                  <span>{toAirport?.flag} {toAirport?.city} ({toAirport?.code})</span>
                 </h1>
 
                 <div className="route-meta-pills">
@@ -197,7 +348,7 @@ export default function SearchResultsPage() {
                   )}
                   <span className="route-meta-pill">
                     <Users size={13} />
-                    <span>{passengers} {passengers > 1 ? 'Passengers' : 'Passenger'}</span>
+                    <span>{passengers} {passengers > 1 ? 'Travellers' : 'Traveller'}</span>
                   </span>
                   <span className="route-meta-pill">
                     <Briefcase size={13} />
@@ -207,7 +358,7 @@ export default function SearchResultsPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               {comparedFlights.length > 0 && (
                 <button
                   type="button"
@@ -224,7 +375,7 @@ export default function SearchResultsPage() {
                 onClick={() => setShowModifySearch(!showModifySearch)}
                 id="modify-search-toggle"
               >
-                <span>{showModifySearch ? 'Hide Search Form' : 'Modify Search'}</span>
+                <span>{showModifySearch ? 'Hide Search' : 'Modify Search'}</span>
                 {showModifySearch ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
             </div>
@@ -241,7 +392,8 @@ export default function SearchResultsPage() {
                   returnDate,
                   tripType,
                   passengers,
-                  cabinClass
+                  cabinClass,
+                  flightCategory: isDomestic ? 'domestic' : 'international'
                 }}
               />
             </div>
@@ -262,7 +414,7 @@ export default function SearchResultsPage() {
               </span>
             </div>
             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>
-              *Simulated demo prices for nearby dates. Click to view flights for that day.
+              *Illustrative demo fares for nearby dates. Click to view flights for that date.
             </span>
           </div>
 
@@ -277,7 +429,7 @@ export default function SearchResultsPage() {
               >
                 {item.isLowest && (
                   <span className="date-strip-best-badge">
-                    <TrendingDown size={10} /> Best Fare
+                    <TrendingDown size={10} /> Lowest Fare
                   </span>
                 )}
                 <span className="date-strip-day">{item.dayName}</span>
@@ -292,16 +444,16 @@ export default function SearchResultsPage() {
       </div>
 
       {/* --------------------------------------------------------------------
-          3. Results Layout (Filter Sidebar + Flight Cards List)
+          3. Results Layout (Advanced Filter Sidebar + Flights List)
           -------------------------------------------------------------------- */}
-      <div className="container">
+      <div className="container" style={{ paddingBottom: '60px' }}>
         <div className="results-layout">
-          {/* Filter Sidebar */}
+          {/* Advanced Filter Sidebar */}
           <aside className="filter-sidebar">
             <div className="filter-sidebar-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, color: 'var(--color-navy)' }}>
                 <Filter size={18} color="var(--color-primary)" />
-                <span>Filter Flights</span>
+                <span>Filters</span>
               </div>
               <button
                 type="button"
@@ -311,18 +463,34 @@ export default function SearchResultsPage() {
                 title="Reset all filters"
               >
                 <RotateCcw size={13} />
-                <span>Reset</span>
+                <span>Reset All</span>
               </button>
+            </div>
+
+            {/* Cabin Class Quick Selector */}
+            <div className="filter-group">
+              <h4 className="filter-group-title">Cabin Class</h4>
+              <select
+                className="field-select"
+                value={cabinClass}
+                onChange={(e) => handleCabinClassChange(e.target.value)}
+                style={{ fontSize: '0.85rem', padding: '8px 12px' }}
+              >
+                <option value="Economy">Economy</option>
+                <option value="Premium Economy">Premium Economy</option>
+                <option value="Business">Business Class</option>
+                <option value="First">First Class</option>
+              </select>
             </div>
 
             {/* Price Slider Filter */}
             <div className="filter-group">
-              <h4 className="filter-group-title">Maximum Price</h4>
+              <h4 className="filter-group-title">Price Range</h4>
               <div className="price-slider-wrap">
                 <div className="price-slider-label">
-                  <span>₹{minPossiblePrice.toLocaleString('en-IN')}</span>
+                  <span>Up to</span>
                   <span style={{ color: 'var(--color-primary)', fontWeight: 800 }}>
-                    ₹{Number(maxPrice).toLocaleString('en-IN')}
+                    ₹{Number(maxPriceFilter).toLocaleString('en-IN')}
                   </span>
                 </div>
                 <input
@@ -331,25 +499,177 @@ export default function SearchResultsPage() {
                   min={minPossiblePrice}
                   max={maxPossiblePrice}
                   step={500}
-                  value={maxPrice}
-                  onChange={(e) => setMaxPrice(Number(e.target.value))}
+                  value={maxPriceFilter}
+                  onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
                   id="price-range-slider"
                 />
               </div>
             </div>
 
-            {/* Stops Filter */}
+            {/* Stops Filter (Non-stop, 1-stop, Multi-stop) */}
             <div className="filter-group">
               <h4 className="filter-group-title">Stops</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label className="filter-checkbox-label">
+                  <input
+                    type="radio"
+                    name="stopsFilter"
+                    checked={stopsFilter === 'all'}
+                    onChange={() => setStopsFilter('all')}
+                  />
+                  <span>All Flights</span>
+                </label>
+                <label className="filter-checkbox-label">
+                  <input
+                    type="radio"
+                    name="stopsFilter"
+                    checked={stopsFilter === 'nonStop'}
+                    onChange={() => setStopsFilter('nonStop')}
+                    id="non-stop-radio"
+                  />
+                  <span>Non-stop flights only</span>
+                </label>
+                <label className="filter-checkbox-label">
+                  <input
+                    type="radio"
+                    name="stopsFilter"
+                    checked={stopsFilter === 'oneStop'}
+                    onChange={() => setStopsFilter('oneStop')}
+                  />
+                  <span>1-Stop / Connecting</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Departure Time Windows Filter */}
+            <div className="filter-group">
+              <h4 className="filter-group-title">Departure Time</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {[
+                  { key: 'morning', label: 'Morning', hours: '6am - 12pm' },
+                  { key: 'afternoon', label: 'Afternoon', hours: '12pm - 6pm' },
+                  { key: 'evening', label: 'Evening', hours: '6pm - 10pm' },
+                  { key: 'night', label: 'Night', hours: '10pm - 6am' }
+                ].map((item) => (
+                  <button
+                    key={`dep-${item.key}`}
+                    type="button"
+                    onClick={() => handleDepTimeToggle(item.key)}
+                    style={{
+                      padding: '8px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: selectedDepTimes.includes(item.key)
+                        ? '2px solid var(--color-primary)'
+                        : '1px solid var(--color-border)',
+                      background: selectedDepTimes.includes(item.key)
+                        ? 'var(--color-primary-light)'
+                        : 'white',
+                      color: selectedDepTimes.includes(item.key)
+                        ? 'var(--color-primary)'
+                        : 'var(--color-navy)',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      fontSize: '0.78rem'
+                    }}
+                  >
+                    <div style={{ fontWeight: 700 }}>{item.label}</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{item.hours}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Arrival Time Windows Filter */}
+            <div className="filter-group">
+              <h4 className="filter-group-title">Arrival Time</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {[
+                  { key: 'morning', label: 'Morning', hours: '6am - 12pm' },
+                  { key: 'afternoon', label: 'Afternoon', hours: '12pm - 6pm' },
+                  { key: 'evening', label: 'Evening', hours: '6pm - 10pm' },
+                  { key: 'night', label: 'Night', hours: '10pm - 6am' }
+                ].map((item) => (
+                  <button
+                    key={`arr-${item.key}`}
+                    type="button"
+                    onClick={() => handleArrTimeToggle(item.key)}
+                    style={{
+                      padding: '8px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: selectedArrTimes.includes(item.key)
+                        ? '2px solid var(--color-primary)'
+                        : '1px solid var(--color-border)',
+                      background: selectedArrTimes.includes(item.key)
+                        ? 'var(--color-primary-light)'
+                        : 'white',
+                      color: selectedArrTimes.includes(item.key)
+                        ? 'var(--color-primary)'
+                        : 'var(--color-navy)',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      fontSize: '0.78rem'
+                    }}
+                  >
+                    <div style={{ fontWeight: 700 }}>{item.label}</div>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{item.hours}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Journey Duration Filter */}
+            <div className="filter-group">
+              <h4 className="filter-group-title">Maximum Duration</h4>
+              <div className="price-slider-wrap">
+                <div className="price-slider-label">
+                  <span>Up to</span>
+                  <span style={{ color: 'var(--color-primary)', fontWeight: 800 }}>
+                    {maxDurationHours}h 00m
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  className="price-range-input"
+                  min={2}
+                  max={maxPossibleDurationHours}
+                  step={1}
+                  value={maxDurationHours}
+                  onChange={(e) => setMaxDurationHours(Number(e.target.value))}
+                />
+              </div>
+            </div>
+
+            {/* Baggage Allowance Filter */}
+            <div className="filter-group">
+              <h4 className="filter-group-title">Check-in Baggage</h4>
+              <select
+                className="field-select"
+                value={baggageFilter}
+                onChange={(e) => setBaggageFilter(e.target.value)}
+                style={{ fontSize: '0.85rem', padding: '8px 12px' }}
+              >
+                <option value="all">Any Baggage Allowance</option>
+                <option value="15kg">At least 15 kg Check-in</option>
+                <option value="20kg">At least 20 kg Check-in</option>
+                <option value="25kg">At least 25 kg Check-in</option>
+                <option value="30kg">30 kg or more Check-in</option>
+              </select>
+            </div>
+
+            {/* Refundable Fares Only */}
+            <div className="filter-group">
+              <h4 className="filter-group-title">Fare Flexibility</h4>
               <label className="filter-checkbox-label">
                 <input
                   type="checkbox"
                   className="filter-checkbox"
-                  checked={nonStopOnly}
-                  onChange={(e) => setNonStopOnly(e.target.checked)}
-                  id="non-stop-checkbox"
+                  checked={refundableOnly}
+                  onChange={(e) => setRefundableOnly(e.target.checked)}
                 />
-                <span>Non-stop flights only</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <ShieldCheck size={14} color="var(--color-success)" />
+                  Refundable Fares Only
+                </span>
               </label>
             </div>
 
@@ -388,7 +708,7 @@ export default function SearchResultsPage() {
                   <button
                     type="button"
                     onClick={() => setComparedFlights([])}
-                    style={{ background: 'none', fontSize: '0.72rem', color: 'var(--color-text-muted)' }}
+                    style={{ background: 'none', border: 'none', fontSize: '0.72rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}
                   >
                     Clear
                   </button>
@@ -413,12 +733,12 @@ export default function SearchResultsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.88rem', color: 'var(--color-navy)', fontWeight: 600 }}>
                 <SlidersHorizontal size={16} color="var(--color-primary)" />
                 <span>
-                  Showing <strong>{filteredAndSortedFlights.length}</strong> of {baseFlights.length} flights
+                  Showing <strong>{filteredAndSortedFlights.length}</strong> of {baseFlights.length} available flights
                 </span>
               </div>
 
               <div className="sort-options">
-                <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>Sort by:</span>
+                <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>Sort:</span>
                 <button
                   className={`sort-btn ${selectedSort === 'cheapest' ? 'active' : ''}`}
                   onClick={() => setSelectedSort('cheapest')}
@@ -471,7 +791,7 @@ export default function SearchResultsPage() {
                 );
               })
             ) : (
-              /* Friendly Empty State */
+              /* Friendly Empty State with Reset Filters */
               <div className="empty-results-card">
                 <div style={{
                   width: '64px',
@@ -487,10 +807,10 @@ export default function SearchResultsPage() {
                   <AlertCircle size={32} />
                 </div>
                 <h3 style={{ fontSize: '1.25rem', marginBottom: '8px', color: 'var(--color-navy)' }}>
-                  No flights match your filters
+                  No flights match your current filters
                 </h3>
                 <p style={{ fontSize: '0.92rem', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
-                  Try adjusting the maximum price slider, deselecting specific airlines, or unchecking the non-stop filter.
+                  Try relaxing your price range, clearing time-of-day filters, or checking multiple stops.
                 </p>
                 <button
                   type="button"
